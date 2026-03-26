@@ -11,17 +11,17 @@ st.set_page_config(page_title="AI Customer Intelligence", layout="wide")
 st.title("🚀 AI Customer Intelligence Platform")
 
 # ================================
-# LOAD MODELS (CACHED)
-# ================================
+import os
+
 @st.cache_resource
 def load_models():
-    kmeans = pickle.load(open("kmeans.pkl", "rb"))
-    scaler = pickle.load(open("scaler.pkl", "rb"))
-    cluster_meaning = pickle.load(open("cluster_meaning.pkl", "rb"))
+    base_path = os.path.dirname(__file__)
+
+    kmeans = pickle.load(open(os.path.join(base_path, "kmeans.pkl"), "rb"))
+    scaler = pickle.load(open(os.path.join(base_path, "scaler.pkl"), "rb"))
+    cluster_meaning = pickle.load(open(os.path.join(base_path, "cluster_meaning.pkl"), "rb"))
+
     return kmeans, scaler, cluster_meaning
-
-kmeans, scaler, cluster_meaning = load_models()
-
 # ================================
 # SIDEBAR INPUT
 # ================================
