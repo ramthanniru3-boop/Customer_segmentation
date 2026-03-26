@@ -1,4 +1,4 @@
-# AI Customer Segmentation & Recommendation System
+# Customer segmentation
 
 ## Features
 - Customer Segmentation (KMeans)
