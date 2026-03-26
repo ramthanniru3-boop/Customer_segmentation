@@ -1,30 +1,35 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
 import pickle
+import numpy as np
 
-# ================================
+# =========================
 # PAGE CONFIG
-# ================================
-st.set_page_config(page_title="AI Customer Intelligence", layout="wide")
+# =========================
+st.set_page_config(page_title="Customer Intelligence", layout="wide")
 
-st.title("🚀 AI Customer Intelligence Platform")
-
-# ================================
-import os
-
+# =========================
+# LOAD MODELS (SAFE)
+# =========================
 @st.cache_resource
 def load_models():
-    base_path = os.path.dirname(__file__)
+    try:
+        kmeans = pickle.load(open("kmeans.pkl", "rb"))
+        scaler = pickle.load(open("scaler.pkl", "rb"))
+        cluster_meaning = pickle.load(open("cluster_meaning.pkl", "rb"))
+        return kmeans, scaler, cluster_meaning
+    except Exception as e:
+        st.error(f"Model loading error: {e}")
+        return None, None, None
 
-    kmeans = pickle.load(open(os.path.join(base_path, "kmeans.pkl"), "rb"))
-    scaler = pickle.load(open(os.path.join(base_path, "scaler.pkl"), "rb"))
-    cluster_meaning = pickle.load(open(os.path.join(base_path, "cluster_meaning.pkl"), "rb"))
+kmeans, scaler, cluster_meaning = load_models()
 
-    return kmeans, scaler, cluster_meaning
-# ================================
+# STOP if models not loaded
+if kmeans is None or scaler is None:
+    st.stop()
+
+# =========================
 # SIDEBAR INPUT
-# ================================
+# =========================
 st.sidebar.header("🎯 Customer Input")
 
 gender = st.sidebar.selectbox("Gender", ["Male", "Female"])
@@ -35,54 +40,55 @@ score = st.sidebar.slider("Spending Score (1-100)", 1, 100, 50)
 # Encode gender
 gender_val = 1 if gender == "Male" else 0
 
-# ================================
+# =========================
+# MAIN TITLE
+# =========================
+st.title("🚀 AI Customer Intelligence Platform")
+
+# =========================
 # PREDICTION
-# ================================
-input_data = np.array([[gender_val, age, income, score]])
-input_scaled = scaler.transform(input_data)
+# =========================
+try:
+    input_data = np.array([[gender_val, age, income, score]])
+    input_scaled = scaler.transform(input_data)
 
-cluster = kmeans.predict(input_scaled)[0]
-cluster_name = cluster_meaning.get(cluster, "Unknown")
+    cluster = kmeans.predict(input_scaled)[0]
 
-# ================================
-# OUTPUT
-# ================================
-st.subheader("🎯 Prediction Result")
+    st.success(f"🎯 Customer belongs to Cluster: {cluster}")
 
-col1, col2 = st.columns(2)
+    if cluster_meaning:
+        st.info(f"💡 Segment: {cluster_meaning.get(cluster, 'Unknown')}")
 
-with col1:
-    st.metric("Cluster", cluster)
+except Exception as e:
+    st.error(f"Prediction error: {e}")
 
-with col2:
-    st.metric("Segment", cluster_name)
-
-# ================================
+# =========================
 # VISUALS
-# ================================
+# =========================
 st.subheader("📊 Model Insights")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    st.image("elbow.png", caption="Elbow Method")
+    try:
+        st.image("elbow.png", caption="Elbow Method")
+    except:
+        st.warning("elbow.png not found")
 
 with col2:
-    st.image("pca_plot.png", caption="PCA Visualization")
+    try:
+        st.image("pca.png", caption="PCA Visualization")
+    except:
+        st.warning("pca.png not found")
 
-# ================================
+# =========================
 # DATA PREVIEW
-# ================================
-st.subheader("📂 Dataset Preview")
+# =========================
+st.subheader("📄 Data Preview")
 
 try:
+    import pandas as pd
     df = pd.read_csv("Mall_Customers.csv")
     st.dataframe(df.head())
 except:
     st.warning("Dataset not found")
-
-# ================================
-# FOOTER
-# ================================
-st.markdown("---")
-st.markdown("💡 Built with Streamlit | ML Model: KMeans + PCA")
