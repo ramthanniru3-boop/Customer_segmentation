@@ -4,136 +4,189 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# =====================
+from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
+from scipy.cluster.hierarchy import dendrogram, linkage
+
+# =========================
 # PAGE CONFIG
-# =====================
+# =========================
 st.set_page_config(page_title="AI Customer Intelligence", layout="wide")
 
-st.title("🚀 AI Customer Intelligence Platform")
-
-# =====================
-# PERSONAS + RECOMMENDATIONS
-# =====================
-cluster_meaning = {
-    0: "💰 High Income - Low Spending (Careful Customers)",
-    1: "🎯 Average Income - Average Spending",
-    2: "🔥 High Income - High Spending (Premium Customers)",
-    3: "🛍 Low Income - High Spending (Impulsive Buyers)",
-    4: "📉 Low Income - Low Spending (Budget Customers)"
-}
-
-recommendations = {
-    0: "Offer discounts & loyalty programs",
-    1: "Provide combo offers & engagement campaigns",
-    2: "Target with premium/luxury products",
-    3: "Promote impulse deals & flash sales",
-    4: "Focus on budget-friendly products"
-}
-
-# =====================
+# =========================
 # LOAD MODELS
-# =====================
+# =========================
 @st.cache_resource
 def load_models():
-    try:
-        kmeans = pickle.load(open("kmeans.pkl", "rb"))
-        scaler = pickle.load(open("scaler.pkl", "rb"))
-        return kmeans, scaler
-    except Exception as e:
-        st.error(f"Model loading error: {e}")
-        return None, None
+    kmeans = pickle.load(open("kmeans.pkl", "rb"))
+    scaler = pickle.load(open("scaler.pkl", "rb"))
+    return kmeans, scaler
 
 kmeans, scaler = load_models()
 
-if kmeans is None:
-    st.stop()
-
-# =====================
+# =========================
 # LOAD DATA
-# =====================
-try:
-    df = pd.read_csv("Mall_Customers.csv")
-except:
-    df = None
+# =========================
+df = pd.read_csv("Mall_Customers.csv")
 
-# =====================
-# TABS
-# =====================
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["📊 EDA", "📉 Elbow", "🌳 Dendrogram", "🎯 Prediction"]
-)
+# =========================
+# TITLE
+# =========================
+st.title("🚀 Customer Intelligence Platform")
 
-# =====================
-# 📊 EDA
-# =====================
-with tab1:
-    st.subheader("Dataset Overview")
+# =========================
+# AUTO PERSONA FUNCTION
+# =========================
+def generate_persona(center):
+    income = center[2]
+    spending = center[3]
 
-    if df is not None:
-        st.write(df.head())
-        st.write(df.describe())
+    if income > 70 and spending > 70:
+        return "💰 Premium Customer"
+    elif income > 70 and spending < 40:
+        return "🎯 Target Customer"
+    elif income < 40 and spending > 70:
+        return "💸 Impulsive Buyer"
+    elif income < 40 and spending < 40:
+        return "📉 Low Value Customer"
     else:
-        st.warning("Dataset not found")
+        return "⚖️ Average Customer"
 
-# =====================
-# 📉 ELBOW
-# =====================
-with tab2:
-    st.subheader("Elbow Method")
+# =========================
+# TABS
+# =========================
+tabs = st.tabs(["Prediction", "PCA", "Dendrogram", "Elbow", "Insights", "EDA"])
 
-    try:
-        img = plt.imread("elbow.png")
-        st.image(img)
-    except:
-        st.warning("elbow.png not found")
+# =========================
+# 1️⃣ PREDICTION
+# =========================
+with tabs[0]:
+    st.header("🎯 Customer Prediction")
 
-# =====================
-# 🌳 DENDROGRAM
-# =====================
-with tab3:
-    st.subheader("Dendrogram")
+    col1, col2 = st.columns(2)
 
-    try:
-        img = plt.imread("dendrogram.png")
-        st.image(img)
-    except:
-        st.warning("dendrogram.png not found")
+    with col1:
+        gender = st.selectbox("Gender", ["Male", "Female"])
+        age = st.slider("Age", 18, 70, 25)
 
-# =====================
-# 🎯 PREDICTION
-# =====================
-with tab4:
-    st.subheader("Customer Prediction")
-
-    gender = st.selectbox("Gender", ["Male", "Female"])
-    age = st.slider("Age", 18, 70, 30)
-    income = st.slider("Annual Income (k$)", 10, 150, 50)
-    score = st.slider("Spending Score", 1, 100, 50)
+    with col2:
+        income = st.slider("Annual Income (k$)", 10, 150, 50)
+        spending = st.slider("Spending Score", 1, 100, 50)
 
     gender_val = 1 if gender == "Male" else 0
+    input_data = np.array([[gender_val, age, income, spending]])
+    input_scaled = scaler.transform(input_data)
 
-    input_data = np.array([[gender_val, age, income, score]])
-
-    try:
-        input_scaled = scaler.transform(input_data)
+    if st.button("Predict Cluster"):
         cluster = kmeans.predict(input_scaled)[0]
+        center = kmeans.cluster_centers_[cluster]
 
-        st.success(f"🎯 Cluster: {cluster}")
+        persona = generate_persona(center)
 
-        st.info(f"👤 Persona: {cluster_meaning.get(cluster)}")
+        st.success(f"Cluster: {cluster}")
+        st.metric("🧠 Persona", persona)
 
-        st.warning(f"💡 Recommendation: {recommendations.get(cluster)}")
+        # Explainability
+        st.subheader("📊 Why this cluster?")
+        st.write(f"Avg Income: {center[2]:.2f}")
+        st.write(f"Avg Spending: {center[3]:.2f}")
 
-    except Exception as e:
-        st.error(f"Prediction error: {e}")
+# =========================
+# 2️⃣ PCA
+# =========================
+with tabs[1]:
+    st.header("📊 PCA Visualization")
 
-# =====================
-# 📍 PCA VISUALIZATION
-# =====================
-st.subheader("📍 PCA Visualization")
+    features = df[["Gender", "Age", "Annual Income (k$)", "Spending Score (1-100)"]]
+    scaled = scaler.transform(features)
 
-try:
-    img = plt.imread("pca_plot.png")
-    st.image(img)
-except:
-    st.warning("pca_plot.png not found")
+    pca = PCA(n_components=2)
+    pca_data = pca.fit_transform(scaled)
+
+    clusters = kmeans.predict(scaled)
+
+    fig, ax = plt.subplots()
+    scatter = ax.scatter(pca_data[:, 0], pca_data[:, 1], c=clusters)
+    ax.set_title("Customer Segments (PCA)")
+    st.pyplot(fig)
+
+# =========================
+# 3️⃣ DENDROGRAM
+# =========================
+with tabs[2]:
+    st.header("🌳 Dendrogram")
+
+    sample_size = st.slider("Sample Size", 20, 100, 50)
+    cutoff = st.slider("Cutoff", 1, 20, 10)
+
+    features = df[["Age", "Annual Income (k$)", "Spending Score (1-100)"]]
+    sample = features.sample(sample_size, random_state=42)
+
+    linked = linkage(sample, method="ward")
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    dendrogram(linked, ax=ax)
+    ax.axhline(y=cutoff, color='r', linestyle='--')
+
+    st.pyplot(fig)
+
+# =========================
+# 4️⃣ ELBOW
+# =========================
+with tabs[3]:
+    st.header("📉 Elbow Method")
+
+    features = df[["Gender", "Age", "Annual Income (k$)", "Spending Score (1-100)"]]
+    scaled = scaler.transform(features)
+
+    inertia = []
+    K = range(1, 10)
+
+    for k in K:
+        km = KMeans(n_clusters=k, random_state=42)
+        km.fit(scaled)
+        inertia.append(km.inertia_)
+
+    fig, ax = plt.subplots()
+    ax.plot(K, inertia, marker='o')
+    st.pyplot(fig)
+
+# =========================
+# 5️⃣ INSIGHTS (NEW 🔥)
+# =========================
+with tabs[4]:
+    st.header("📊 Cluster Insights")
+
+    centers = kmeans.cluster_centers_
+
+    insights = []
+    for i, center in enumerate(centers):
+        persona = generate_persona(center)
+        insights.append({
+            "Cluster": i,
+            "Avg Age": round(center[1], 1),
+            "Avg Income": round(center[2], 1),
+            "Avg Spending": round(center[3], 1),
+            "Persona": persona
+        })
+
+    insights_df = pd.DataFrame(insights)
+
+    st.dataframe(insights_df)
+
+    # Download option
+    csv = insights_df.to_csv(index=False).encode("utf-8")
+    st.download_button("⬇️ Download Report", csv, "cluster_insights.csv")
+
+# =========================
+# 6️⃣ EDA
+# =========================
+with tabs[5]:
+    st.header("📈 Dataset Overview")
+
+    st.dataframe(df.head())
+    st.dataframe(df.describe())
+
+    fig, ax = plt.subplots()
+    df["Age"].hist(ax=ax)
+    st.pyplot(fig)
