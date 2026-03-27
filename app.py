@@ -14,7 +14,7 @@ from scipy.cluster.hierarchy import dendrogram, linkage
 st.set_page_config(page_title="AI Customer Intelligence", layout="wide")
 
 # =========================
-# LOAD MODELS
+# LOAD MODELS (ONLY FOR VISUALS)
 # =========================
 @st.cache_resource
 def load_models():
@@ -29,23 +29,23 @@ kmeans, scaler = load_models()
 # =========================
 df = pd.read_csv("Mall_Customers.csv")
 
+if df["Gender"].dtype == object:
+    df["Gender"] = df["Gender"].map({"Male": 1, "Female": 0})
+
 # =========================
 # TITLE
 # =========================
-st.title("🚀 Customer Intelligence Platform")
+st.title("🚀 AI Customer Intelligence Platform")
 
 # =========================
-# AUTO PERSONA FUNCTION
+# 🔥 LOGIC-BASED PERSONA (FINAL)
 # =========================
-def generate_persona(center):
-    income = center[2]
-    spending = center[3]
-
-    if income > 70 and spending > 70:
+def get_persona(income, spending):
+    if income >= 70 and spending >= 70:
         return "💰 Premium Customer"
-    elif income > 70 and spending < 40:
+    elif income >= 70 and spending < 40:
         return "🎯 Target Customer"
-    elif income < 40 and spending > 70:
+    elif income < 40 and spending >= 70:
         return "💸 Impulsive Buyer"
     elif income < 40 and spending < 40:
         return "📉 Low Value Customer"
@@ -58,7 +58,7 @@ def generate_persona(center):
 tabs = st.tabs(["Prediction", "PCA", "Dendrogram", "Elbow", "Insights", "EDA"])
 
 # =========================
-# 1️⃣ PREDICTION
+# 1️⃣ PREDICTION (LOGIC BASED)
 # =========================
 with tabs[0]:
     st.header("🎯 Customer Prediction")
@@ -73,26 +73,23 @@ with tabs[0]:
         income = st.slider("Annual Income (k$)", 10, 150, 50)
         spending = st.slider("Spending Score", 1, 100, 50)
 
-    gender_val = 1 if gender == "Male" else 0
-    input_data = np.array([[gender_val, age, income, spending]])
-    input_scaled = scaler.transform(input_data)
+    if st.button("Predict Customer Type"):
+        persona = get_persona(income, spending)
 
-    if st.button("Predict Cluster"):
-        cluster = kmeans.predict(input_scaled)[0]
-        center = kmeans.cluster_centers_[cluster]
+        st.success(f"🧠 Persona: {persona}")
 
-        persona = generate_persona(center)
+        st.subheader("📊 Why this result?")
+        st.write(f"Income Level: {income}")
+        st.write(f"Spending Behavior: {spending}")
 
-        st.success(f"Cluster: {cluster}")
-        st.metric("🧠 Persona", persona)
-
-        # Explainability
-        st.subheader("📊 Why this cluster?")
-        st.write(f"Avg Income: {center[2]:.2f}")
-        st.write(f"Avg Spending: {center[3]:.2f}")
+        st.subheader("📌 Input Summary")
+        st.write(f"Gender: {gender}")
+        st.write(f"Age: {age}")
+        st.write(f"Income: {income}")
+        st.write(f"Spending: {spending}")
 
 # =========================
-# 2️⃣ PCA
+# 2️⃣ PCA (KMEANS USED HERE ONLY)
 # =========================
 with tabs[1]:
     st.header("📊 PCA Visualization")
@@ -106,8 +103,8 @@ with tabs[1]:
     clusters = kmeans.predict(scaled)
 
     fig, ax = plt.subplots()
-    scatter = ax.scatter(pca_data[:, 0], pca_data[:, 1], c=clusters)
-    ax.set_title("Customer Segments (PCA)")
+    ax.scatter(pca_data[:, 0], pca_data[:, 1], c=clusters)
+    ax.set_title("Customer Segments (Visualization Only)")
     st.pyplot(fig)
 
 # =========================
@@ -149,34 +146,24 @@ with tabs[3]:
 
     fig, ax = plt.subplots()
     ax.plot(K, inertia, marker='o')
+    ax.set_title("Elbow Curve")
     st.pyplot(fig)
 
 # =========================
-# 5️⃣ INSIGHTS (NEW 🔥)
+# 5️⃣ INSIGHTS (NO CLUSTER DEPENDENCE)
 # =========================
 with tabs[4]:
-    st.header("📊 Cluster Insights")
+    st.header("📊 Business Insights")
 
-    centers = kmeans.cluster_centers_
+    st.write("Customer segmentation based on income & spending:")
 
-    insights = []
-    for i, center in enumerate(centers):
-        persona = generate_persona(center)
-        insights.append({
-            "Cluster": i,
-            "Avg Age": round(center[1], 1),
-            "Avg Income": round(center[2], 1),
-            "Avg Spending": round(center[3], 1),
-            "Persona": persona
-        })
-
-    insights_df = pd.DataFrame(insights)
-
-    st.dataframe(insights_df)
-
-    # Download option
-    csv = insights_df.to_csv(index=False).encode("utf-8")
-    st.download_button("⬇️ Download Report", csv, "cluster_insights.csv")
+    st.markdown("""
+    - 💰 Premium → High income & high spending  
+    - 🎯 Target → High income & low spending  
+    - 💸 Impulsive → Low income & high spending  
+    - 📉 Low Value → Low income & low spending  
+    - ⚖️ Average → Mid range  
+    """)
 
 # =========================
 # 6️⃣ EDA
@@ -189,4 +176,5 @@ with tabs[5]:
 
     fig, ax = plt.subplots()
     df["Age"].hist(ax=ax)
+    ax.set_title("Age Distribution")
     st.pyplot(fig)
